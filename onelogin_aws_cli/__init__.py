@@ -1,6 +1,7 @@
 """OneLogin/AWS Business logic"""
 
 from typing import Optional
+import time
 
 import configparser
 import xml.etree.ElementTree as ElementTree
@@ -81,16 +82,32 @@ class OneloginAWS(object):
             if not self.mfa.ready():
                 self.mfa.select_device(saml_resp.mfa.devices)
                 if not self.mfa.has_otp:
-                    self.mfa.prompt_token()
-
-            saml_resp = self.check_for_errors(
-                self.ol_client.get_saml_assertion_verifying(
-                    self.config['aws_app_id'],
-                    self.mfa.device.id,
-                    saml_resp.mfa.state_token,
-                    self.mfa.otp
-                )
-            )
+                    if self.mfa.device.type == 'OneLogin Protect':
+                        print("Send OTP now using OneLogin Protect or respond "
+                              "to push notification or enter below")
+                        while True:
+                            saml_verif = self.ol_client.\
+                                    get_saml_assertion_verifying(
+                                        self.config['aws_app_id'],
+                                        self.mfa.device.id,
+                                        saml_resp.mfa.state_token,
+                                    )
+                            if saml_verif and saml_verif.type != 'pending':
+                                print("OTP verification received")
+                                break
+                            print("OTP verification still pending. "
+                                  "Retrying in 20 seconds...")
+                            time.sleep(20)
+                        saml_resp = saml_verif
+                    else:
+                        self.mfa.prompt_token()
+                        saml_resp = self.ol_client.\
+                            get_saml_assertion_verifying(
+                                self.config['aws_app_id'],
+                                self.mfa.device.id,
+                                saml_resp.mfa.state_token,
+                                self.mfa.otp,
+                            )
 
         self.saml = saml_resp
 
