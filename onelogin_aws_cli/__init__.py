@@ -85,19 +85,24 @@ class OneloginAWS(object):
                     if self.mfa.device.type == 'OneLogin Protect':
                         print("Send OTP now using OneLogin Protect or respond "
                               "to push notification or enter below")
+                        self.ol_client.\
+                            get_saml_assertion_verifying(
+                                self.config['aws_app_id'],
+                                self.mfa.device.id,
+                                saml_resp.mfa.state_token,
+                            )
                         while True:
                             saml_verif = self.ol_client.\
-                                    get_saml_assertion_verifying(
-                                        self.config['aws_app_id'],
-                                        self.mfa.device.id,
-                                        saml_resp.mfa.state_token,
-                                    )
+                                get_saml_assertion_verifying(
+                                    self.config['aws_app_id'],
+                                    self.mfa.device.id,
+                                    saml_resp.mfa.state_token,
+                                    do_not_notify=True,
+                                )
                             if saml_verif and saml_verif.type != 'pending':
                                 print("OTP verification received")
                                 break
-                            print("OTP verification still pending. "
-                                  "Retrying in 20 seconds...")
-                            time.sleep(20)
+                            time.sleep(2)
                         saml_resp = saml_verif
                     else:
                         self.mfa.prompt_token()
